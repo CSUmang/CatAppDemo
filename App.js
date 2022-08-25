@@ -42,6 +42,31 @@ const Stack = createNativeStackNavigator();
 //Cat breed list screen
 function CatBreedScreen() {
 
+  //Variables using react native hooks
+  const [value, setValue] = useState(null);
+  const [carBridList,setCatBridList] = useState([]);
+
+  //React native useEffect hook
+  useEffect(() => {
+    getCatBreedListFromApi();
+  }, []);
+
+  //Cat breed list api for filter dropdown
+  const getCatBreedListFromApi = async () => {
+    return fetch('https://api.thecatapi.com/v1/breeds?limit=30&page=1')
+      .then((response) => response.json())
+      .then((jsonResponse) => {
+        if(jsonResponse){
+          jsonResponse.forEach(element => {
+            setCatBridList(carBridList => [...carBridList, { label: element.name, value: element.id }])
+          });
+        }
+      })
+      .catch((error) => {
+        Alert.alert("Error", error.message)
+      });
+  };
+
   //Render UI
   return (
     <View>
@@ -61,8 +86,6 @@ function CatBreedScreen() {
         searchPlaceholder="Search breed..."
         value={value}
         onChange={item => {
-          setCatImageList([])
-          setShowLoader(true)
           setValue(item.value);
           getCatImagesFromApi(item.value);
         }}
