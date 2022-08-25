@@ -21,6 +21,9 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 //Dropdown component
 import { Dropdown } from 'react-native-element-dropdown';
 
+//Image preview component
+import Lightbox from 'react-native-lightbox-v2';
+
 //Application main screen
 export default function App() {
   return (
@@ -42,14 +45,25 @@ const Stack = createNativeStackNavigator();
 //Cat breed list screen
 function CatBreedScreen() {
 
+  //Page Limit
+  const PAGE_PER_LIMIT = 10;
+
   //Variables using react native hooks
   const [value, setValue] = useState(null);
   const [carBridList,setCatBridList] = useState([]);
+  const [catImageList, setCatImageList] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pageLimit, setPageLimit] = useState(10);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showLoader, setShowLoader] = useState(false);
 
   //React native useEffect hook
   useEffect(() => {
     getCatBreedListFromApi();
   }, []);
+
+  useEffect(() => {
+  }, [isLoading]);
 
   //Cat breed list api for filter dropdown
   const getCatBreedListFromApi = async () => {
@@ -67,8 +81,66 @@ function CatBreedScreen() {
       });
   };
 
+  //Get cat images api call
+  function getCatImagesFromApi(breedID) {
+    if (catImageList.length == 0) {
+      setShowLoader(true)
+    }
+    return fetch('https://api.thecatapi.com/v1/images/search?breed_ids='+breedID+'&limit='+PAGE_PER_LIMIT+'&page='+page)
+    .then((response) => response.json())
+    .then((jsonResponse) => {
+      if(jsonResponse){
+        //Set paglimit for pagination
+        setPageLimit(Object.keys(jsonResponse).length)
+        
+        jsonResponse.forEach(element => {
+          setCatImageList(catImageList => [...catImageList, element])
+        });
+        setIsLoading(false)
+        setShowLoader(false)
+      }
+    })
+    .catch((error) => {
+      setIsLoading(false)
+      setShowLoader(false)
+      Alert.alert("Error", error.message)
+    });
+  }
+
+  //Render cat image list item 
+  const imageItem = ({ item, index }) => {
+    return(
+      <View>
+        <Lightbox underlayColor="white">
+          <Image
+            defaultSource={require('./assets/placeholderImg.png')}
+            style={styles.contain}
+            resizeMode='contain'
+            source={{ uri: item.url}}
+          />
+        </Lightbox>
+        <View style={styles.lineSep} />
+      </View>
+    )
+  }
+
+  //Show loading animation from bottom for pagination
+  function renderBottomLoader() {
+    return (
+        <View style={styles.viewBottomLoader}>
+          <ActivityIndicator color={'black'} size={30} />
+          <Text style={{fontSize: 16}}>Please wait...</Text>
+        </View>
+    )
+  }
+
   //Render UI
   return (
+    //Show activity indicator first time or item changed from filter
+    showLoader ? <View style={{flex:1, justifyContent: 'center', alignItems: 'center'}}>
+      <ActivityIndicator size={'large'} color={'black'} />
+    </View> 
+    : 
     <View>
       {/* Filter dropdown */}
       <Dropdown
@@ -86,9 +158,29 @@ function CatBreedScreen() {
         searchPlaceholder="Search breed..."
         value={value}
         onChange={item => {
+          setCatImageList([])
+          setShowLoader(true)
           setValue(item.value);
           getCatImagesFromApi(item.value);
         }}
+      />
+
+      {/* Cat image list */}
+      <FlatList
+        extraData={isLoading}
+        initialNumToRender={10} 
+        onEndReached={() => {
+          setPage(page + 1);
+          if (pageLimit == PAGE_PER_LIMIT) {
+            setIsLoading(true)
+            getCatImagesFromApi(value);
+          }
+        }}
+        style={{paddingBottom: 30}}
+        ListFooterComponent={isLoading ? renderBottomLoader : null}
+        keyExtractor={(item, index) => index.toString()}
+        data={catImageList}
+        renderItem={imageItem}
       />
     </View>
   );
@@ -127,4 +219,19 @@ const styles = StyleSheet.create({
     height: 40,
     fontSize: 16,
   },
+  contain: {
+    flex: 1,
+    height: 150
+  },
+  lineSep: {
+    height: 1,
+    backgroundColor: "gray",
+    width: '100%',
+    marginVertical: 10,
+  },
+  viewBottomLoader:{
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center'
+  }
 });
